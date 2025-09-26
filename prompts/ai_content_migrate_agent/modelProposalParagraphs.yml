@@ -21,6 +21,8 @@ prompt:
     If no changes are required, return the input model unchanged. Preserve field ordering
     where possible and prefer resilient XPaths with fallbacks.
     Output ONLY valid JSON that matches the schema above.
+    HARD RULES:
+        - For each vocabulary added to the taxonomies key add an entity reference to taxonomy terms field into the content_types key. Taxonomies key cannot exist without a corresponding field into the content_types key.
   possible_actions:
     proposeModel: Parse the html file and propose a Drupal-ready content model.
     refineModel: Update an existing model based on explicit change requests

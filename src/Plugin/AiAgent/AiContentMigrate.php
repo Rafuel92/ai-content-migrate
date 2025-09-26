@@ -18,6 +18,7 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\media\Entity\MediaType;
+use HeadlessChromium\BrowserFactory;
 
 
 /**
@@ -245,71 +246,34 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
    * Determine task type from input data.
    */
   protected function determineTaskType(): string {
-    $desc = $this->task->getDescription();
+    $data = $this->agentHelper->runSubAgent('RouterCall', [
+      'existing model' => json_encode($this->getLastModel()),
+    ]);
 
-    // Collect all URLs found in the description (both full URLs and bare domains)
-    $urls = [];
-
-    // 1) Full URLs with scheme (http/https)
-    if (preg_match_all('~\bhttps?://[^\s<>"\'\)\]]+~i', $desc, $m1) && !empty($m1[0])) {
-      foreach ($m1[0] as $raw) {
-        // Strip trailing punctuation that might be attached in prose
-        $clean = rtrim($raw, ".,;:!?)]}");
-        $urls[] = $clean;
-      }
-    }
-
-    // 2) Domains (with or without www) + optional path/query/fragment; add https:// if missing
-    if (preg_match_all('~\b(?:(?:https?:)?//)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9]))+(?:/[^\s<>"\'\)\]]*)?~i', $desc, $m2) && !empty($m2[0])) {
-      foreach ($m2[0] as $raw) {
-        $clean = rtrim($raw, ".,;:!?)]}");
-        // Prepend https:// if no scheme is present
-        if (stripos($clean, '://') === false) {
-          $clean = 'https://' . $clean;
-        }
-        $urls[] = $clean;
-      }
-    }
-
-    // Deduplicate URLs; order will be: full URLs first (as they appeared), then schema-less domains
-    $urls = array_values(array_unique($urls, SORT_STRING));
-
+    $url = '';
     // Flag whether there are multiple URLs and set it via the provided setter
-    if(!empty($urls)){
-      $this->setPages($urls);
+    if(isset($data[0]['urls']) && !empty($data[0]['urls'])){
+      $this->setPages($data[0]['urls']);
+      $url = $data[0]['urls'][0] ?? '';
     }
 
     // Keep using the first URL (if any) for the existing logic
-    $url = $urls[0] ?? '';
 
     // Detect "change model" command (case-insensitive)
-    $isChangingModel = (stripos($desc, 'change model') !== false);
+    $isChangingModel = $data['action'] == 'refineModel';
 
-    $isDryRun = (stripos($desc, 'dry run') !== false);
+    $isDryRun = $data['action'] == 'DryRunImport';
 
     $this->setDryRun($isDryRun);
-    // If no URL and not changing the model, default to 'applySchema'
+
+    // If no URL and not changing the model, we import the already defined content
     if (empty($url) && !$isChangingModel) {
       return 'applySchema';
     }
 
     // Optionally fetch the HTML content from the first URL (skip if changing the model)
     if (!$isChangingModel && !empty($url)) {
-      try {
-        $html = \Drupal::httpClient()->request('GET', $url, [
-          'headers' => [
-            'User-Agent' => 'Drupal Crawler/1.0',
-            'Accept' => 'text/html',
-          ],
-          'timeout' => 10,
-        ]);
-        $contentHtml = $html->getBody()->getContents();
-      } catch (\Throwable $e) {
-        // In case of network/HTTP errors, proceed with empty content
-        $contentHtml = '';
-      }
-    } else {
-      $contentHtml = '';
+      $contentHtml = $this->retrieveContentHtml($url);
     }
 
     // Ask the sub-agent for a proposed model based on the fetched HTML and last known model
@@ -1363,6 +1327,72 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
       ]);
     }
     return $this->t("created queue of $num elements, run drupal standard cron to execute the migration");
+  }
+
+  private function retrieveContentHtml(string $url){
+    /*try {
+      $html = \Drupal::httpClient()->request('GET', $url, [
+        'headers' => [
+          'User-Agent' => 'Drupal Crawler/1.0',
+          'Accept' => 'text/html',
+        ],
+        'timeout' => 10,
+      ]);
+      $contentHtml = $html->getBody()->getContents();
+    } catch (\Throwable $e) {
+      // In case of network/HTTP errors, proceed with empty content
+      $contentHtml = '';
+    }
+    return $contentHtml;*/
+
+
+      $contentHtml = '';
+      $browser = null;
+
+      try {
+        // Avvia Chrome/Chromium headless
+        // (passa il path del binario se necessario: new BrowserFactory('/usr/bin/google-chrome'))
+        $chromePath = getenv('CHROME_PATH') ?: '/usr/bin/chromium';
+        $factory = new BrowserFactory($chromePath);
+        $browser = $factory->createBrowser([
+          'headless' => true,
+          'userAgent' => 'Drupal Crawler/1.0',
+          'customFlags' => [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--disable-dev-shm-usage',
+          ],
+        ]);
+
+        $page = $browser->createPage();
+
+
+        // Naviga e attendi il rendering JS
+        $timeoutMs = 5000; // 5s
+        $page->navigate($url)->waitForNavigation('networkIdle', $timeoutMs);
+
+        // (Opzionale) attesa di un selettore che indica che i dati sono stati montati
+        // $page->waitForSelector('main, #app, body', $timeoutMs);
+
+        // HTML post-render
+        $contentHtml = (string)$page
+          ->evaluate('document.documentElement.outerHTML')
+          ->getReturnValue();
+
+      } catch (\Throwable $e) {
+        // In caso di errori restituisci stringa vuota
+        $contentHtml = '';
+      } finally {
+        if ($browser) {
+          try {
+            $browser->close();
+          } catch (\Throwable $ignore) {
+          }
+        }
+      }
+
+      return $contentHtml;
+
   }
 
 

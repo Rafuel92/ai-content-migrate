@@ -1,0 +1,9 @@
+{
+    "name": "drupal/ai_content_migrate",
+    "description": "AI Content Migrate: Drupal module for AI assisted content migrations",
+    "type": "drupal-module",
+    "require": {
+        "php": ">=8.1",
+        "chrome-php/chrome": "^1.0"
+    }
+}
