@@ -249,47 +249,36 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
     $data = $this->agentHelper->runSubAgent('RouterCall', [
       'existing model' => json_encode($this->getLastModel()),
     ]);
-
     $url = '';
     // Flag whether there are multiple URLs and set it via the provided setter
     if(isset($data[0]['urls']) && !empty($data[0]['urls'])){
       $this->setPages($data[0]['urls']);
       $url = $data[0]['urls'][0] ?? '';
+      \Drupal::state()->delete('ai_content_migrate.last_model');
     }
-
-    // Keep using the first URL (if any) for the existing logic
-
     // Detect "change model" command (case-insensitive)
     $isChangingModel = $data['action'] == 'refineModel';
-
     $isDryRun = $data['action'] == 'DryRunImport';
-
     $this->setDryRun($isDryRun);
-
     // If no URL and not changing the model, we import the already defined content
     if (empty($url) && !$isChangingModel) {
       return 'applySchema';
     }
-
     // Optionally fetch the HTML content from the first URL (skip if changing the model)
     if (!$isChangingModel && !empty($url)) {
       $contentHtml = $this->retrieveContentHtml($url);
     }
-
     // Ask the sub-agent for a proposed model based on the fetched HTML and last known model
     $data = $this->agentHelper->runSubAgent('modelProposal', [
       'html of the old website page' => $contentHtml,
       'existing model' => json_encode($this->getLastModel()),
     ]);
-
     // Persist the fetched HTML for later steps (only if we actually fetched it)
     if (!$isChangingModel) {
       $this->setHtmlPage($contentHtml);
     }
-
     // Store agent output for downstream steps
     $this->setData($data);
-
     // Continue with the standard flow (discover source, import media, create CT/fields, etc.)
     return 'discoverSource';
   }
