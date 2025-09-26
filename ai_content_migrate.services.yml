@@ -1,0 +1,9 @@
+services:
+  ai_content_migrate.importer:
+    class: 'Drupal\ai_content_migrate\Importer'
+    arguments:
+      - '@entity_type.manager'
+      - '@entity_field.manager'
+      - '@file.repository'
+      - '@http_client'
+      - '@logger.factory'

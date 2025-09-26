@@ -1,0 +1,18 @@
+<?php
+
+/**
+ * @file
+ * ai_content_migrate.module
+ *
+ * Placeholder for future hooks and integrations.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function ai_content_migrate_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.ai_content_migrate':
+      return '<p>' . t('AI Content Migrate module helps migrate content using AI-based suggestions.') . '</p>';
+  }
+}

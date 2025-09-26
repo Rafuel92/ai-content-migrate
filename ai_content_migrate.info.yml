@@ -1,0 +1,9 @@
+name: AI Content Migrate
+type: module
+description: 'Automate content modeling and migration from legacy HTML into Drupal.'
+package: Custom
+core_version_requirement: ^10.3 || ^11
+dependencies:
+  - node
+  - media
+  - ai_agents
