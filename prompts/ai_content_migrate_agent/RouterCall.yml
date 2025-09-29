@@ -11,13 +11,8 @@ prompt:
       - "urls": an array of HTTP/HTTPS URLs extracted from user_prompt
         (deduplicate, preserve order of appearance; use [] if none).
     Do NOT include explanations, rationale, confidence, or any extra fields.
-
     URL requirement:
-      - For any import action (importContent, bulkImport, DryRunImport), user_prompt MUST contain one or more HTTP/HTTPS URLs.
-      - bulkImport requires TWO OR MORE URLs in user_prompt and a non-empty existing model.
-      - importContent requires EXACTLY ONE URL in user_prompt and a non-empty existing model.
-      - DryRunImport requires NO URLs in user_prompt and a non-empty existing model.
-
+      - For any analyze action (analyzeParagraphs, analyzeDirect), user_prompt MUST contain ONE or MORE HTTP/HTTPS URLs.
     Synonyms:
       - "run import", "execute migration", "start import", "migrate content", "ingest data" => importContent (single URL) or bulkImport (multiple URLs)
       - "bulk import", "batch import", "many URLs", "multiple pages", "sitemap list" => bulkImport
@@ -26,22 +21,19 @@ prompt:
       - "analyze paragraphs", "import with paragraphs", "paragraph-based", "blocks/components", "paragraph types" => analyzeParagraphs
       - "analyze content", "simple/flat/normal import", "no paragraphs", "direct field mapping" => analyzeDirect
       - general informational questions => question
-
     HARD RULES:
       - If NO existing model is provided or the model JSON is EMPTY (all four arrays empty),
         you MUST NOT return "refineModel", "importContent", "bulkImport", or "DryRunImport".
         If the user clearly prefers a strategy, return "analyzeParagraphs" or "analyzeDirect"; otherwise return "askClarification".
       - "refineModel" is allowed ONLY when a non-empty, valid model JSON is included.
-      - "importContent" is allowed ONLY when a non-empty, valid model JSON is available AND the prompt contains exactly ONE URL.
-      - "bulkImport" is allowed ONLY when a non-empty, valid model JSON is available AND the prompt contains TWO OR MORE URLs.
-      - "DryRunImport" is allowed ONLY when a non-empty, valid model JSON is available AND the prompt contains ONE OR MORE URLs.
-      - If the user requests import/dry run but provides NO URLs, return "askClarification".
+      - "importContent" is allowed ONLY when a non-empty, valid model JSON is available.
+      - "bulkImport" is allowed ONLY when a non-empty, valid model JSON is available.
+      - "DryRunImport" is allowed ONLY when a non-empty, valid model JSON is available.
       - Extract only absolute HTTP/HTTPS URLs; ignore non-web schemes (mailto:, ftp:, etc.).
-
   possible_actions:
-    importContent: "Execute the content import using the current (non-empty) model/mapping with a single URL."
-    bulkImport: "Execute a batch content import using the current (non-empty) model/mapping with multiple URLs."
-    DryRunImport: "Simulate the import (no data persisted) using the current (non-empty) model for one or more URLs."
+    importContent: "Execute the content import using the current (non-empty) model/mapping."
+    bulkImport: "Execute a batch content import using the current (non-empty) model/mapping."
+    DryRunImport: "Simulate the import (no data persisted) using the current (non-empty) model."
     refineModel: "Apply explicit changes to an existing (non-empty) model provided in the prompt."
     analyzeParagraphs: "Analyze the feasibility/approach for Paragraphs-based structuring/import."
     analyzeDirect: "Analyze the feasibility/approach for a direct/flat structuring/import without Paragraphs."
@@ -55,28 +47,17 @@ prompt:
       urls: []
 
   one_shot_learning_examples:
-    - user_prompt: |
-        DRY RUN this import using the current model:
-        https://example.com/products/x1
-      expected_json: '{"action":"DryRunImport","urls":["https://example.com/products/x1"]}'
+    - user_prompt: "DRY RUN this import using the current model"
+      expected_json: '{"action":"DryRunImport","urls":[]}'
 
-    - user_prompt: |
-        Please simulate the import for these pages (no changes saved):
-        https://example.com/products/x1
-        https://example.com/products/x2
-      expected_json: '{"action":"DryRunImport","urls":["https://example.com/products/x1","https://example.com/products/x2"]}'
+    - user_prompt: "Please simulate the import (no changes saved)"
+      expected_json: '{"action":"DryRunImport","urls":[]}'
 
-    - user_prompt: |
-        Import this page using the current model:
-        https://example.com/products/x1
-      expected_json: '{"action":"importContent","urls":["https://example.com/products/x1"]}'
+    - user_prompt: "Import this page using the current model"
+      expected_json: '{"action":"importContent","urls":[]}'
 
-    - user_prompt: |
-        Import all these pages using the current model:
-        https://example.com/products/x1
-        https://example.com/products/x2
-        https://example.com/products/x3
-      expected_json: '{"action":"bulkImport","urls":["https://example.com/products/x1","https://example.com/products/x2","https://example.com/products/x3"]}'
+    - user_prompt: "Import all these pages using the current model"
+      expected_json: '{"action":"bulkImport","urls":[]}'
 
     - user_prompt: |
         We want to import these pages splitting into Paragraphs, but we don't have a model yet:
@@ -99,6 +80,3 @@ prompt:
 
     - user_prompt: "What's the difference between Paragraphs and Layout Builder?"
       expected_json: '{"action":"question","urls":[]}'
-
-    - user_prompt: "Please dry run the import using the existing model (no URLs provided)."
-      expected_json: '{"action":"askClarification","urls":[]}'

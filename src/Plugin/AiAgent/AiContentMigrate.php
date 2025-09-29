@@ -247,6 +247,7 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
    */
   protected function determineTaskType(): string {
     $data = $this->agentHelper->runSubAgent('RouterCall', [
+      'prompt' => $this->task->getDescription(),
       'existing model' => json_encode($this->getLastModel()),
     ]);
     $url = '';
@@ -1319,28 +1320,9 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
   }
 
   private function retrieveContentHtml(string $url){
-    /*try {
-      $html = \Drupal::httpClient()->request('GET', $url, [
-        'headers' => [
-          'User-Agent' => 'Drupal Crawler/1.0',
-          'Accept' => 'text/html',
-        ],
-        'timeout' => 10,
-      ]);
-      $contentHtml = $html->getBody()->getContents();
-    } catch (\Throwable $e) {
-      // In case of network/HTTP errors, proceed with empty content
-      $contentHtml = '';
-    }
-    return $contentHtml;*/
-
-
-      $contentHtml = '';
       $browser = null;
-
       try {
         // Avvia Chrome/Chromium headless
-        // (passa il path del binario se necessario: new BrowserFactory('/usr/bin/google-chrome'))
         $chromePath = getenv('CHROME_PATH') ?: '/usr/bin/chromium';
         $factory = new BrowserFactory($chromePath);
         $browser = $factory->createBrowser([
@@ -1355,12 +1337,10 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
 
         $page = $browser->createPage();
 
-
         // Naviga e attendi il rendering JS
         $timeoutMs = 5000; // 5s
         $page->navigate($url)->waitForNavigation('networkIdle', $timeoutMs);
 
-        // (Opzionale) attesa di un selettore che indica che i dati sono stati montati
         // $page->waitForSelector('main, #app, body', $timeoutMs);
 
         // HTML post-render
@@ -1369,7 +1349,7 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
           ->getReturnValue();
 
       } catch (\Throwable $e) {
-        // In caso di errori restituisci stringa vuota
+        \Drupal::logger('ai_content_migrate')->error($e->getMessage());
         $contentHtml = '';
       } finally {
         if ($browser) {
@@ -1379,9 +1359,7 @@ class AIContentMigrate extends AiAgentBase implements AiAgentInterface {
           }
         }
       }
-
       return $contentHtml;
-
   }
 
 
